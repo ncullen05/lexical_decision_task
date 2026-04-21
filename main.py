@@ -1,112 +1,129 @@
 from participant import TrialParticipant
 from filereader import WordFileReader
+import tkinter as tk
+from tkinter import messagebox
 
-#An instance of WordFileReader is instantiated
+# An instance of WordFileReader is instantiated
 file_1 = WordFileReader("words.txt")
 words_dict = file_1.all_rounds()
 shuffle_dict = file_1.shuffle_rounds()
 
-#An instance of TrialParticipant is instantiated
-trial_participant = TrialParticipant("John", "Doe") 
+# An instance of TrialParticipant is instantiated
+trial_participant = TrialParticipant("John", "Doe")
 trial_participant.set_words(words_dict)
 
-#Welcome message is printed to the user
-print("\n")
-print("Welcome, to the Lexical Decision Task, %s %s!" % (trial_participant.firstname, trial_participant.lastname))
-print("In this task, you will be presented with four words.")
-print("Your task is to select whether all four words are of the English language!")
-consent = input("Do you wish to continue with the experiment? Select 'y' for yes and 'n' for no. ")
-while consent.lower() not in ["y", "n"]: #Validates the users input
-    consent = input("Please select a valid response: ")
+class LexicalDecisionGUI:
+    def __init__(self, root, participant):
+        self.root = root
+        self.participant = participant
+        self.root.title("Lexical Decision Task")
+        self.root.geometry("400x300")
 
-if consent.lower() == "n":
-    run_game = False
-elif consent.lower() == "y":
-    run_game = True
+        # Additional variables for features
+        self.consecutive_correct = 0
+        self.round_counter = 0
+        self.dictionary_shuffled = False
+        self.difficulty_switch = False
+        self.waiting_for_response = False
 
-print("---")
-print("\n")
+        # Bind key presses
+        self.root.bind('<Key>', self.key_press)
 
-run_game = True #Initialises a flag to keep the game running
-consecutive_correct = 0
-difficulty_switch = False
-round_counter = 0  #Counter to track the number of rounds
-dictionary_shuffled = False  #Tracks if the dictionary has been shuffled   
+        # Welcome message
+        self.label = tk.Label(root, text=f"Welcome to the Lexical Decision Task, {participant.firstname} {participant.lastname}!\n"
+                                         "In this task, you will be presented with four words.\n"
+                                         "Your task is to select whether all four words are of the English language!",
+                              wraplength=350)
+        self.label.pack(pady=10)
 
-while run_game: #Game loop commences
+        # Consent
+        self.consent_label = tk.Label(root, text="Do you wish to continue with the experiment? (y/n)")
+        self.consent_label.pack()
 
-    print("The word position is now at: %s" % trial_participant.get_position()) #Displays the current word position to the user
-    trial_participant.select_words() #Selects and displays the words for the current position
-    participant_selection = input("Select 'y' or 'n' to move to the next position ") #Prompts the participant to make a selection either 'y' or 'n'
-    
-    if participant_selection.lower() not in ["y", "n"]: #Validates the users input
-        print("\n"*2) #Spacing
-        print("Please select a valid response...") #Asks for another input if the input is invalid
-    else:
-        trial_participant.response(participant_selection) #Records the participant's response
-        trial_participant.increment_choice(trial_participant.answer) #Increments correct/incorrect choice based on the response
-        next = trial_participant.increment_position() #Attempts to increment the position
-        print("\n"*2) #Spacing
+        self.game_started = False
 
-        #Increment round counter
-        round_counter += 1
-
-        #After two rounds, ask the user if they want to shuffle the dictionary
-        if round_counter == 2 and not dictionary_shuffled:
-            choose_dict = input("Two rounds have passed. Select 'y' to shuffle the dictionary or 'n' to keep it the same: ")
-            while choose_dict.lower() not in ["y", "n"]:  #Validates the users input
-                choose_dict = input("Please select a valid response: ")
-
-            if choose_dict.lower() == "y":
-                shuffle_dict = file_1.shuffle_rounds()
-                trial_participant.set_words(shuffle_dict)
-                print("Dictionary has been shuffled!")
-            else:
-                print("Dictionary remains the same.")
-            
-            dictionary_shuffled = True  
-       
-        if next == False: #Checks if there is more rounds left
-            run_game = False #Ends the game if theres no rounds left
-            print("\n"*2) #Spacing
-            print("You got %s correct and you got %s wrong" % (trial_participant.get_correct(), trial_participant.get_incorrect())) #Prints final score
-            print(trial_participant) #Prints the participant's details 
-            print("There are no more selections available. The experiment has ended.") #End message
+    def key_press(self, event):
+        key = event.char.lower()
+        if not self.game_started:
+            if key == 'y':
+                self.start_game()
+            elif key == 'n':
+                self.quit_game()
         else:
-            pass
+            if self.waiting_for_response:
+                if not self.difficulty_switch:
+                    if key == 'y':
+                        self.respond('y')
+                    elif key == 'n':
+                        self.respond('n')
+                else:
+                    if key == 'z':
+                        self.respond('z')
+                    elif key == 'm':
+                        self.respond('m')
 
-        if trial_participant.answer == True:  
-            consecutive_correct += 1  #Increment consecutive correct counter
-        else:
-            consecutive_correct = 0  #Reset counter if incorrect
+    def start_game(self):
+        self.game_started = True
+        self.consent_label.destroy()
+        self.label.config(text="The word position is now at: " + str(self.participant.get_position()))
+        self.show_words()
+
+    def quit_game(self):
+        self.root.quit()
+
+    def show_words(self):
+        if not self.game_started:
+            return
+        words = self.participant.select_words()
+        self.words_label = tk.Label(self.root, text="Words: " + ", ".join(words), font=("Arial", 14))
+        self.words_label.pack(pady=10)
+
+        instruction = "Press 'y' for Yes, 'n' for No" if not self.difficulty_switch else "Press 'z' for Yes, 'm' for No"
+        self.question_label = tk.Label(self.root, text=f"Are all these words English?\n{instruction}")
+        self.question_label.pack()
         
-        if consecutive_correct == 3 and not difficulty_switch:
-            print("You're doing great! Increasing difficulty...")
-            print("From now on select 'z' for Yes and 'm' for No\n")
-        else:
-            pass
+        self.waiting_for_response = True
 
-        #Check if it's time to change the responses required
-        while consecutive_correct == 3 and not difficulty_switch:
-            print("The word position is now at: %s" % trial_participant.get_position()) #Displays the current word position to the user
-            trial_participant.select_words() #Selects and displays the words for the current position
-            participant_selection = input("Select 'z' for Yes and 'm' for No... ") #Prompts the participant to make a selection either 'y' or 'n'
-            trial_participant.change_response_keys()
-            if participant_selection.lower() not in ["z", "m"]: #Validates the users input
-                print("\n"*2) #Spacing
-                print("Please select a valid response...") #Asks for another input if the input is invalid
-            else:
-                trial_participant.response(participant_selection) #Records the participant's response
-                trial_participant.increment_choice(trial_participant.answer) #Increments correct/incorrect choice based on the response
-                next = trial_participant.increment_position() #Attempts to increment the position
-                print("\n"*2) #Spacing
-            
-            if next == False: #Checks if there is more rounds left
-                difficulty_switch = True
-                run_game = False #Ends the game if theres no rounds left
-                print("\n"*2) #Spacing
-                print("You got %s correct and you got %s wrong" % (trial_participant.get_correct(), trial_participant.get_incorrect())) #Prints final score
-                print(trial_participant) #Prints the participant's details 
-                print("There are no more selections available. The experiment has ended.") #End message
-            else:
-                pass
+    def respond(self, response):
+        self.waiting_for_response = False
+        self.participant.response(response)
+        self.participant.increment_choice(self.participant.answer)
+        
+        if self.participant.answer:
+            self.consecutive_correct += 1
+        else:
+            self.consecutive_correct = 0
+        
+        if self.consecutive_correct == 3 and not self.difficulty_switch:
+            self.difficulty_switch = True
+            messagebox.showinfo("Difficulty Increased", "You're doing great! Increasing difficulty...\nFrom now on select 'z' for Yes and 'm' for No")
+            self.participant.change_response_keys()
+            # Buttons will be updated in show_words
+        
+        next_round = self.participant.increment_position()
+        self.words_label.destroy()
+        self.question_label.destroy()
+        if next_round:
+            self.round_counter += 1
+            if self.round_counter == 2 and not self.dictionary_shuffled:
+                shuffle = messagebox.askyesno("Shuffle Dictionary", "Two rounds have passed. Do you want to shuffle the dictionary?")
+                if shuffle:
+                    shuffle_dict = file_1.shuffle_rounds()
+                    self.participant.set_words(shuffle_dict)
+                    messagebox.showinfo("Shuffled", "Dictionary has been shuffled!")
+                else:
+                    messagebox.showinfo("No Shuffle", "Dictionary remains the same.")
+                self.dictionary_shuffled = True
+            self.label.config(text="The word position is now at: " + str(self.participant.get_position()))
+            self.show_words()
+        else:
+            self.end_game()
+
+    def end_game(self):
+        messagebox.showinfo("Game Over", f"Correct: {self.participant.get_correct()}\nIncorrect: {self.participant.get_incorrect()}")
+        self.root.quit()
+
+# Run the GUI
+root = tk.Tk()
+gui = LexicalDecisionGUI(root, trial_participant)
+root.mainloop()
