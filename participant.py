@@ -85,7 +85,7 @@ class TrialParticipant:
     def select_words(self): #Selects a random word list
         self.random_word = random.randint(0,1) #Assigns a 0 or 1 randomly to an instance variable
         words_at_type = self.words[self.position][self.word_type[self.random_word]] #Selects the words at the position 0 or 1
-        print(words_at_type) #Displays selected words
+        return words_at_type
 
     def response(self, selection): #Checks if the response matches the current word type
         key_association = self.possible_selections[self.word_type[self.random_word]] #The expected/correct response
